@@ -1,0 +1,26 @@
+// server.js const express = require('express'); const mongoose = require('mongoose'); const cors = require('cors'); const path = require('path'); const dotenv = require('dotenv'); const nodemailer = require('nodemailer');
+
+dotenv.config(); const app = express(); app.use(cors()); app.use(express.json()); app.use(express.static(path.join(__dirname, 'public')));
+
+// Connexion MongoDB mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+
+const userSchema = new mongoose.Schema({ name: String, email: String, status: { type: String, default: 'non-validé' }, confirmationKey: String });
+
+const User = mongoose.model('User', userSchema);
+
+// Nodemailer config const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: process.env.EMAIL_SENDER, pass: 'motdepasse_app' // Utilise un mot de passe d'application Gmail } });
+
+function generateKey() { return Math.floor(100000 + Math.random() * 900000).toString(); }
+
+// Inscription utilisateur app.post('/api/register', async (req, res) => { const { name, email } = req.body; const confirmationKey = generateKey(); const user = new User({ name, email, confirmationKey }); await user.save();
+
+// Envoi d'email await transporter.sendMail({ from: process.env.EMAIL_SENDER, to: email, subject: 'Clé de confirmation Onam', text: Votre clé de validation est : ${confirmationKey} });
+
+res.json({ message: 'Inscription réussie. Clé envoyée à votre email.' }); });
+
+// Validation app.post('/api/validate', async (req, res) => { const { email, key } = req.body; const user = await User.findOne({ email }); if (user && user.confirmationKey === key) { user.status = 'validé'; await user.save(); res.json({ message: 'Utilisateur validé avec succès !' }); } else { res.json({ message: 'Clé incorrecte ou utilisateur non trouvé.' }); } });
+
+// Récupérer les utilisateurs app.get('/api/users', async (req, res) => { const users = await User.find(); res.json(users); });
+
+// Démarrer le serveur app.listen(process.env.PORT || 3000, () => { console.log('Serveur Onam démarré sur le port ' + process.env.PORT); });
+
